@@ -1,0 +1,54 @@
+# 使用R语言对时间序列数据进行季节性调整
+# 涉及内容：时间序列数据的生成、间隔不相等的处理、季节性的剔除
+
+# 时间序列数据，季节性调整 
+
+# tidy the data
+# 导入包：xts , readxl
+library(xts)
+library(readxl)
+library(plyr)
+
+# 导入数据
+operation_temp <- as.data.frame(read_excel("D:/R_data/operation_rate.xlsx"))
+operation_temp$Date <- as.Date(operation_temp$Date)
+
+# 将数据中空缺的日期补齐
+# 建立一个空的日期数据，并将这两个数据合并，空缺日期设为缺失值
+Date<- seq(from=as.Date('2013/09/04'), to=as.Date('2018/04/12'), by='1 day')
+
+date_df <- as.data.frame(Date,c=NA)
+operation <- merge(operation_temp,date_df,by="Date",all=TRUE)
+operation$c <- NULL
+
+# 对于第二至七列数据，将其转化成timeseries，命名为operation_xts
+coredata <- operation[2:7]
+date <- as.Date(operation$Date)
+rownames(coredata) <- date
+operation_xts <- as.xts(coredata) 
+
+# 将其中的数据缺失值进行处理，分别取前一个和后一个值
+operation_xts <- na.locf(operation_xts)
+operation_xts <- na.locf(operation_xts, fromLast=TRUE)
+
+
+# 写循环，对每一个皆做如此分解，并存到一个dataframe里
+tdata <-list()
+tdata_components <- list()
+tdata_del <- list()
+seasonal <- list()
+
+for(i in 1:6){
+  tdata[[i]] <- ts(operation_xts[,i],start=1,freq=365)
+  tdata_components[[i]] <- decompose(tdata[[i]])
+  tdata_del[[i]] <- (tdata[[i]]-tdata_components[[i]]$seasonal)
+  seasonal[[i]] <- tdata_components[[i]]$seasonal
+}
+
+# 将去除季节性因素后的时间序列数据、季节项保存为dateframe格式，并输出。
+operation_del <- as.data.frame(tdata_del)
+seasonal <- as.data.frame(seasonal)
+write.csv(operation_del,"D:/operaion_del.csv")
+write.csv(seasonal,"D:/seasonal.csv")
+
+
